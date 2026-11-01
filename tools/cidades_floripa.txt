@@ -1,0 +1,9 @@
+# Grande Florianópolis — 3D avançado (prioridade depois de Salvador)
+floripa -48.530 -27.600 0.07
+floripa-norte -48.470 -27.450 0.06
+floripa-ingleses -48.400 -27.440 0.04
+floripa-lagoa -48.460 -27.590 0.035
+floripa-sul -48.490 -27.690 0.045
+sao-jose-sc -48.630 -27.600 0.04
+palhoca -48.670 -27.645 0.035
+floripa-sul2 -48.530 -27.765 0.09

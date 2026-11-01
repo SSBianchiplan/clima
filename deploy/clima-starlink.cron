@@ -1,0 +1,2 @@
+# GPlanSiS Clima — órbitas Starlink (CelesTrak atualiza a cada 2 h)
+23 */2 * * * root /opt/clima/bin/starlink.sh >/dev/null 2>&1

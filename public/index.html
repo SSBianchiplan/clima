@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GPlanSiS Clima</title>
+<meta name="description" content="Análise meteorológica: condição atual, avisos, meteograma, 16 dias, comparação de modelos, qualidade do ar e mar.">
+<meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Clima">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://gibs.earthdata.nasa.gov" crossorigin>
+<link rel="preconnect" href="https://server.arcgisonline.com" crossorigin>
+<link rel="preconnect" href="https://elevation-tiles-prod.s3.amazonaws.com" crossorigin>
+<link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
+<link rel="preconnect" href="https://api.open-meteo.com" crossorigin>
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<link rel="stylesheet" href="app.css">
+<script src="theme.js"></script>
+<script src="vendor/chart.umd.min.js" defer></script>
+<script src="vendor/maplibre-gl.js" defer></script>
+<script src="vendor/pmtiles.js" defer></script>
+<script src="vendor/maplibre-contour.min.js" defer></script>
+<script src="icons.js" defer></script>
+<script src="app.js" defer></script>
+<script src="experts.js" defer></script>
+<script src="lab.js" defer></script>
+<script src="sat.js" defer></script>
+<script src="wind3d.js" defer></script>
+<script src="home.js" defer></script>
+<script src="menu.js" defer></script>
+<script src="timeline.js" defer></script>
+<script src="places.js" defer></script>
+<script src="flightsim.js" defer></script>
+<script src="webcams.js" defer></script>
+<script src="geo.js" defer></script>
+<script src="pred.js" defer></script>
+<script src="sports.js" defer></script>
+<script src="travel.js" defer></script>
+<script src="routes.js" defer></script>
+<script src="bridges3d.js" defer></script>
+<script src="joy.js" defer></script>
+<script src="drive.js" defer></script>
+<script src="drone.js" defer></script>
+<script src="roofs3d.js" defer></script>
+<script src="meteo.js" defer></script>
+<script src="gps.js" defer></script>
+<script src="layout.js" defer></script>
+</head>
+<body data-sky="clear-day">
+<script src="boot.js"></script>
+<nav id="lvRail" class="lv-rail glass" aria-label="Atalhos do mapa"></nav>
+<div id="satbg" class="satbg" aria-hidden="true"></div>
+<div class="sky" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i></div>
+
+<div class="shell">
+  <!-- barra de ferramentas -->
+  <header class="toolbar glass">
+    <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="brand"><img src="icon.svg" alt="" width="22" height="22"><span>Clima</span><small>GPlanSiS</small></div>
+    <div class="tb-left">
+      <button type="button" class="tb-btn" id="sideTg" aria-expanded="true" title="Recolher menu"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg><span>Menu</span></button>
+      <button type="button" class="tb-btn" id="routesBtn" title="Rotas e navegação"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z"/></svg><span>Rotas</span></button>
+      <div class="tb-view" id="tbView" aria-label="Visualização e imagem de satélite"></div>
+    </div>
+    <div class="search">
+      <svg class="sico" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4 4"/></svg>
+      <input id="q" type="search" placeholder="Buscar cidade" autocomplete="off" aria-label="Buscar cidade">
+      <div class="results glass" id="results" role="listbox"></div>
+    </div>
+    <div class="tools">
+      <button class="ibtn" id="geo" title="Usar minha localização" aria-label="Usar minha localização"><svg viewBox="0 0 20 20"><path d="M17 3 3 9.2l6.2 1.6L10.8 17z"/></svg></button>
+      <a class="ibtn" id="satBtn" href="#sat" title="Alternar Widgets ⇄ Mapa" aria-label="Alternar Widgets e Mapa" aria-pressed="false"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5"/><path d="M2.5 10h15M10 2.5c2.2 2.3 2.2 12.7 0 15M10 2.5c-2.2 2.3-2.2 12.7 0 15"/></svg></a>
+      <button class="ibtn" id="reload" title="Atualizar" aria-label="Atualizar"><svg viewBox="0 0 20 20"><path d="M16 10a6 6 0 1 1-1.8-4.3M16 3v4h-4"/></svg></button>
+      <div class="seg" role="radiogroup" aria-label="Aparência" id="themeSeg">
+        <button data-t="light" role="radio" title="Claro" aria-label="Claro"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.5"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.3 4.3l1.4 1.4M14.3 14.3l1.4 1.4M4.3 15.7l1.4-1.4M14.3 5.7l1.4-1.4"/></svg></button>
+        <button data-t="auto" role="radio" title="Automático" aria-label="Automático"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 3a7 7 0 0 0 0 14z" class="fillc"/></svg></button>
+        <button data-t="dark" role="radio" title="Escuro" aria-label="Escuro"><svg viewBox="0 0 20 20"><path d="M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5a6.5 6.5 0 1 0 8 8z"/></svg></button>
+        <button data-t="sat" role="radio" title="Satélite (todo o sistema)" aria-label="Satélite"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3c2 2.2 2 11.8 0 14M10 3c-2 2.2-2 11.8 0 14"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- barra lateral -->
+  <aside class="sidebar glass">
+    <nav class="nav" aria-label="Seções">
+      <h4>Painel</h4>
+      <a href="#home" class="xl"><svg viewBox="0 0 20 20"><rect x="3" y="3" width="6" height="6" rx="1.6"/><rect x="11" y="3" width="6" height="6" rx="1.6"/><rect x="3" y="11" width="6" height="6" rx="1.6"/><rect x="11" y="11" width="6" height="6" rx="1.6"/></svg><span>Minha tela<small>widgets · satélite</small></span></a>
+      <a href="#sat" class="xl dsk"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5"/><path d="M2.5 10h15M10 2.5c2.2 2.3 2.2 12.7 0 15M10 2.5c-2.2 2.3-2.2 12.7 0 15"/></svg><span>Mapa<small>satélite · globo 3D</small></span></a>
+      <a href="#s-now"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.5"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2"/></svg>Agora</a>
+      <a href="#s-alerts" class="dsk"><svg viewBox="0 0 20 20"><path d="M10 3 2.5 16.5h15z"/><path d="M10 8.5v3.5M10 14.2v.1"/></svg>Avisos</a>
+      <a href="#s-meteo" class="dsk"><svg viewBox="0 0 20 20"><path d="M2.5 14l4-5 3.5 3 4-6 3.5 4"/></svg>Meteograma</a>
+      <a href="#s-days" class="dsk"><svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="13" rx="2.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3"/></svg>16 dias</a>
+      <a href="#s-models" class="dsk"><svg viewBox="0 0 20 20"><path d="M2.5 13c3-6 5-6 7.5-2s4.5 4 7.5-3M2.5 9c3 3 6 4 15-1"/></svg>Modelos</a>
+      <a href="#s-env" class="dsk"><svg viewBox="0 0 20 20"><path d="M2.5 12c2-2 3.5-2 5 0s3 2 5 0 3.5-2 5 0M2.5 16c2-2 3.5-2 5 0s3 2 5 0 3.5-2 5 0M10 3c2 2.5 3 4 3 5.5a3 3 0 0 1-6 0C7 7 8 5.5 10 3z"/></svg>Ar e mar</a>
+      <h4 class="h4x">Especialistas</h4>
+      <a href="#agro" class="xl"><svg viewBox="0 0 20 20"><path d="M10 18V7M10 10c-2.5 0-4-2-4-4 2.5 0 4 2 4 4zm0 0c2.5 0 4-2 4-4-2.5 0-4 2-4 4zm0 4c-2.5 0-4-2-4-4 2.5 0 4 2 4 4zm0 0c2.5 0 4-2 4-4-2.5 0-4 2-4 4z"/></svg><span>Ceres<small>agro</small></span></a>
+      <a href="#ops" class="xl"><svg viewBox="0 0 20 20"><path d="M10 2.5 3.5 5v5c0 4 3 7 6.5 8 3.5-1 6.5-4 6.5-8V5z"/><path d="M7 10l2 2 4-4"/></svg><span>Vigia<small>operações</small></span></a>
+      <h4 class="h4x">Esportes</h4>
+      <a href="#mar" class="xl"><svg viewBox="0 0 20 20"><path d="M2 12c2-2 3.5-2 5.3 0s3.4 2 5.3 0 3.4-2 5.4 0M2 16c2-2 3.5-2 5.3 0s3.4 2 5.3 0 3.4-2 5.4 0M6 9c0-3.3 2.7-6 6-6-1.4 1.4-2 3.3-1.3 5.3"/></svg><span>Mar<small>ondas · maré · esportes</small></span></a>
+      <a href="#vento" class="xl"><svg viewBox="0 0 20 20"><path d="M2.5 7h10a2.5 2.5 0 1 0-2.5-2.5M2.5 11h14a2.5 2.5 0 1 1-2.5 2.5M2.5 15h7"/></svg><span>Vento<small>kite · vela · voo livre</small></span></a>
+      <a href="#viagem" class="xl"><svg viewBox="0 0 20 20"><path d="M2.5 11.5 17.5 5l-4 11-3.2-4-3.3 2.7V11z"/></svg><span>Viagem<small>clima · voos · hotéis</small></span></a>
+      <h4 class="h4x">Análises</h4>
+      <a href="#lab" class="xl dsk"><svg viewBox="0 0 20 20"><path d="M7.5 2.5h5M8 2.5v5L3.8 15.3A1.6 1.6 0 0 0 5.2 17.5h9.6a1.6 1.6 0 0 0 1.4-2.2L12 7.5v-5"/><path d="M6 12.5h8"/></svg><span>Laboratório<small>ensemble · perfil</small></span></a>
+      <a href="#pred" class="xl"><svg viewBox="0 0 20 20"><path d="M10 2.5 2 17h16z"/><path d="M10 8v4M10 14.5v.1"/></svg><span>Preditivo<small>alarmes · 7 dias</small></span></a>
+    </nav>
+    <div class="places">
+      <div class="ph"><h4>Locais</h4><button class="ibtn sm" id="fav" title="Salvar local atual" aria-label="Salvar local atual"><svg viewBox="0 0 20 20"><path d="m10 2.8 2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8.1l5-.7z"/></svg></button></div>
+      <div id="placesList"></div>
+    </div>
+  </aside>
+
+  <!-- conteúdo -->
+  <main class="content" id="content">
+    <div id="status" class="status glass">Carregando dados meteorológicos…</div>
+
+    <div id="app" class="hidden">
+      <section id="s-now" class="hero">
+        <div class="hero-main glass">
+          <p class="place" id="place"></p>
+          <div class="now">
+            <p class="temp" id="temp"></p>
+            <div class="cond">
+              <div id="condIcon"></div>
+              <div class="name" id="condName"></div>
+              <div class="feels" id="feels"></div>
+            </div>
+          </div>
+          <div class="reading" id="reading"></div>
+          <div class="past" id="past"></div>
+          <div class="hours" id="hours" aria-label="Próximas 24 horas"></div>
+        </div>
+        <div class="instruments">
+          <div class="inst glass" data-m="wind" role="button" tabindex="0" aria-label="Detalhes: Vento"><h3>Vento</h3><div class="compass"><svg id="compass" width="70" height="70" viewBox="0 0 70 70" aria-hidden="true"></svg><div><div class="v" id="wind"></div></div></div><div class="s" id="windS"></div></div>
+          <div class="inst glass" data-m="press" role="button" tabindex="0" aria-label="Detalhes: Pressão ao nível do mar"><h3>Pressão ao nível do mar</h3><div class="v" id="press"></div><div class="s" id="pressS"></div></div>
+          <div class="inst glass" data-m="hum" role="button" tabindex="0" aria-label="Detalhes: Umidade e ponto de orvalho"><h3>Umidade e ponto de orvalho</h3><div class="v" id="hum"></div><div class="s" id="humS"></div></div>
+          <div class="inst glass" data-m="cloud" role="button" tabindex="0" aria-label="Detalhes: Nebulosidade e visibilidade"><h3>Nebulosidade e visibilidade</h3><div class="v" id="cloud"></div><div class="s" id="cloudS"></div></div>
+          <div class="inst glass" data-m="uv" role="button" tabindex="0" aria-label="Detalhes: Índice UV"><h3>Índice UV</h3><div class="v" id="uv"></div><div class="uvbar"><i id="uvDot"></i></div><div class="s" id="uvS"></div></div>
+          <div class="inst glass" data-m="sun" role="button" tabindex="0" aria-label="Detalhes: Sol"><h3>Sol</h3><div class="v" id="sun"></div><div class="s" id="sunS"></div></div>
+        </div>
+      </section>
+
+      <section id="s-alerts">
+        <div class="sh"><h2>Avisos derivados</h2><p>Regras aplicadas sobre a previsão das próximas 48 h: vento, chuva, convecção, calor, UV, nevoeiro e incerteza entre modelos.</p></div>
+        <div class="alerts" id="alerts"></div>
+      </section>
+
+      <section id="s-meteo">
+        <div class="sh">
+          <h2>Meteograma</h2>
+          <p>Variáveis horárias no mesmo eixo de tempo. A linha tracejada marca a hora atual.</p>
+          <div class="seg txt" role="group" aria-label="Período" id="rangeSeg">
+            <button data-r="48" aria-pressed="true">48 horas</button>
+            <button data-r="168" aria-pressed="false">7 dias</button>
+          </div>
+        </div>
+        <div class="meteo glass">
+          <div class="panel"><div class="lbl">Temperatura<i style="background:var(--heat)"></i>ar<i style="background:var(--heat);opacity:.45"></i>sensação<i style="background:var(--dew)"></i>orvalho</div><div class="cv"><canvas id="cTemp"></canvas></div></div>
+          <div class="panel"><div class="lbl">Precipitação<i style="background:var(--rain)"></i>mm/h<i style="background:var(--storm)"></i>probabilidade</div><div class="cv sm"><canvas id="cRain"></canvas></div></div>
+          <div class="panel"><div class="lbl">Vento a 10 m<i style="background:var(--ink)"></i>médio<i style="background:var(--danger)"></i>rajada</div><div class="cv sm"><canvas id="cWind"></canvas></div><div class="arrows" id="arrows"></div></div>
+          <div class="panel"><div class="lbl">Pressão (hPa)</div><div class="cv sm"><canvas id="cPress"></canvas></div></div>
+          <div class="panel"><div class="lbl">Nuvens por camada<i style="background:var(--ink-3)"></i>baixas<i style="background:var(--rain)"></i>médias<i style="background:var(--storm)"></i>altas</div><div class="cv sm"><canvas id="cCloud"></canvas></div></div>
+          <div class="panel"><div class="lbl">Instabilidade<i style="background:var(--warn)"></i>CAPE (J/kg)<i style="background:var(--storm)"></i>índice de levantamento</div><div class="cv sm"><canvas id="cConv"></canvas></div></div>
+        </div>
+      </section>
+
+      <section id="s-days">
+        <div class="sh"><h2>Próximos 16 dias</h2><p>Faixa mínima–máxima de cada dia. O traço marca a média climatológica (2015–2024) da mesma época; a anomalia compara a máxima prevista com essa média.</p></div>
+        <div class="days glass">
+          <div class="days-head"><span>Dia</span><span></span><span>Temperatura</span><span>Chuva</span><span>Prob.</span><span>Rajada</span><span>Anomalia</span></div>
+          <div id="days"></div>
+        </div>
+      </section>
+
+      <section id="s-models">
+        <div class="sh"><h2>Comparação de modelos</h2><p>Temperatura prevista por cinco modelos globais. Quanto mais as curvas divergem, menor a confiança na previsão.</p></div>
+        <div class="two">
+          <div class="card glass"><div class="cv" style="height:280px"><canvas id="cModels"></canvas></div></div>
+          <div class="card glass"><h3>Dispersão diária</h3><p class="sub">Máxima média entre modelos e desvio-padrão. Chuva: soma diária, menor e maior valor.</p><div class="tbl"><table id="modelTbl"></table></div></div>
+        </div>
+      </section>
+
+      <section id="s-env">
+        <div class="two">
+          <div class="card glass" id="aqCard">
+            <h3>Qualidade do ar</h3><p class="sub" id="aqSub">Modelo CAMS, valores atuais.</p>
+            <div class="aqi"><div class="v" id="aqi"></div><div id="aqiTxt"></div></div>
+            <div class="pills" id="aqPills"></div>
+            <div class="cv sm" style="margin-top:12px"><canvas id="cAir"></canvas></div>
+          </div>
+          <div class="card glass" id="marCard">
+            <h3>Mar</h3><p class="sub">Ondas no ponto de mar mais próximo.</p>
+            <div class="pills" id="marPills"></div>
+            <div class="cv sm" style="margin-top:12px"><canvas id="cMar"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        Dados: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (previsão, modelos, qualidade do ar, mar, ERA5 histórico), licença CC BY 4.0. Imagens de satélite NOAA GOES-19 via NASA GIBS; radar RainViewer; rótulos © Esri; órbitas Starlink CelesTrak. Uso interno, não comercial. Os especialistas aplicam critérios técnicos sobre a previsão e não substituem medição no local nem o responsável técnico.
+        <span id="updated"></span>
+      </footer>
+    </div>
+
+    <div id="m-home" class="xmod"><div id="home-body"><div class="xload">Carregando a sua tela…</div></div></div>
+    <div id="m-agro" class="xmod"><div id="x-agro-body"><div class="xload">Aguardando a previsão…</div></div></div>
+    <div id="m-viagem" class="xmod"><div id="viagem-body"><div class="xload">Abra para planejar a viagem.</div></div></div>
+    <div id="m-mar" class="xmod"><div id="mar-body"><div class="xload">Abra para analisar o mar.</div></div></div>
+    <div id="m-vento" class="xmod"><div id="vento-body"><div class="xload">Abra para analisar o vento.</div></div></div>
+    <div id="m-pred" class="xmod"><div id="pred-body"><div class="xload">Abra para rodar a análise preditiva.</div></div></div>
+    <div id="m-lab" class="xmod"><div id="lab-body"><div class="xload">Abra para rodar as análises.</div></div></div>
+    <div id="m-ops" class="xmod"><div id="x-ops-body"><div class="xload">Aguardando a previsão…</div></div></div>
+  </main>
+</div>
+<aside id="satpanel" class="satpanel" aria-label="Controles do satélite"></aside>
+<div id="altTip" class="alttip" hidden></div>
+<footer id="statusbar" class="statusbar" aria-label="Hora e fonte das imagens"></footer>
+<section id="measure" class="measure" hidden aria-label="Medição"></section>
+<dialog id="modal" class="modal" aria-label="Detalhes"></dialog>
+</body>
+</html>

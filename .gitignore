@@ -1,0 +1,21 @@
+# segredos e configuração local (nunca versionar)
+deploy/clima-tomtom.caddy
+deploy/.vps
+tools/.env
+.env
+*.key
+
+# dados gerados (grandes; publicados direto no servidor)
+_ghsl/
+_obh/
+public/data-heights/*.geojson
+tools/.capitais_wd_vazias
+tools/.wd_adiar
+
+# sistema e editores
+.DS_Store
+__pycache__/
+*.pyc
+.claude/
+node_modules/
+---exclude=.DS_Store

@@ -1,0 +1,3 @@
+# GPlanSiS Clima: camadas do tempo — de hora em hora; só trabalha quando há rodada nova
+17 * * * * root cd /opt/clima/meteo && venv/bin/python gfs.py /opt/clima/data/meteo/gfs >> /opt/clima/meteo/gfs.log 2>&1
+37 * * * * root cd /opt/clima/meteo && venv/bin/python ecmwf.py /opt/clima/data/meteo/ecmwf >> /opt/clima/meteo/ecmwf.log 2>&1

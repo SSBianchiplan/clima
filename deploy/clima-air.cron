@@ -1,0 +1,1 @@
+*/5 * * * * root /usr/bin/python3 /opt/clima/bin/air-collector.py >/dev/null 2>&1

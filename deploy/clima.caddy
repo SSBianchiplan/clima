@@ -1,0 +1,82 @@
+# =============================================================================
+#  GPlanSiS Clima — clima.gplansis.com
+#  Importado pelo /etc/caddy/Caddyfile. Bloco próprio: não toca em outro site.
+#  Site estático em /opt/clima/public. Os dados vêm direto do navegador para a
+#  Open-Meteo (CORS aberto), então não há backend nem proxy aqui.
+#
+#  Não importa `seguranca_hub` porque ele fixa geolocation=() e o botão
+#  "Usar minha localização" precisa de geolocation=(self).
+# =============================================================================
+
+import /etc/caddy/clima-tomtom.caddy
+
+clima.gplansis.com {
+	import embed_os
+	encode zstd gzip
+	root * /opt/clima/public
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(self), camera=(), microphone=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://upload.wikimedia.org https://volcano.si.edu https://commons.wikimedia.org https://i.ytimg.com https://gibs.earthdata.nasa.gov https://tilecache.rainviewer.com https://server.arcgisonline.com https://elevation-tiles-prod.s3.amazonaws.com https://tiles.openfreemap.org https://a.tiles.openrailwaymap.org https://b.tiles.openrailwaymap.org https://a.tile-cyclosm.openstreetmap.fr https://b.tile-cyclosm.openstreetmap.fr; font-src 'self'; connect-src 'self' blob: https://api.open-meteo.com https://air-quality-api.open-meteo.com https://marine-api.open-meteo.com https://archive-api.open-meteo.com https://geocoding-api.open-meteo.com https://api.bigdatacloud.net https://ensemble-api.open-meteo.com https://gibs.earthdata.nasa.gov https://api.rainviewer.com https://tilecache.rainviewer.com https://server.arcgisonline.com https://elevation-tiles-prod.s3.amazonaws.com https://tiles.openfreemap.org https://a.tiles.openrailwaymap.org https://b.tiles.openrailwaymap.org https://a.tile-cyclosm.openstreetmap.fr https://b.tile-cyclosm.openstreetmap.fr https://nominatim.openstreetmap.org https://pt.wikipedia.org https://en.wikipedia.org https://www.wikidata.org https://tiles.overturemaps.org https://stac.overturemaps.org https://valhalla1.openstreetmap.de; manifest-src 'self'; worker-src 'self' blob:; base-uri 'self'; form-action 'none'; frame-src https://www.youtube-nocookie.com https://www.youtube.com; frame-ancestors 'self'"
+		-Server
+	}
+
+	@manifesto path /manifest.webmanifest
+	header @manifesto Content-Type "application/manifest+json; charset=utf-8"
+
+	# Sem hash no nome dos arquivos: página, app e SW sempre revalidam.
+	@revalidar path / /index.html /app.js /experts.js /lab.js /sat.js /home.js /wind3d.js /menu.js /timeline.js /routes.js /bridges3d.js /joy.js /drive.js /drone.js /roofs3d.js /meteo.js /gps.js /layout.js /boot.js /icons.js /places.js /geo.js /flightsim.js /starlink-worker.js /app.css /theme.js /sw.js /manifest.webmanifest
+	header @revalidar Cache-Control "no-cache, must-revalidate"
+	@vendor path /vendor/*
+	header @vendor Cache-Control "public, max-age=31536000, immutable"
+
+	# Aeronaves: o adsb.lol (posições, ODbL) e o adsbdb.com (rotas) não enviam CORS;
+	# o navegador fala com o próprio domínio e o Caddy repassa.
+	handle_path /adsb/* {
+		reverse_proxy https://api.adsb.lol {
+			header_up Host api.adsb.lol
+		}
+	}
+	# OpenSky Network (pesquisa, uso não comercial): trajeto do voo atual desde a decolagem
+	handle_path /opensky/* {
+		reverse_proxy https://opensky-network.org {
+			header_up Host opensky-network.org
+			rewrite /api{uri}
+		}
+	}
+	handle_path /adsbdb/* {
+		reverse_proxy https://api.adsbdb.com {
+			header_up Host api.adsbdb.com
+		}
+	}
+
+	# TomTom (trânsito ao vivo e rotas): a chave fica só no servidor, no arquivo
+	# /etc/caddy/clima-tomtom.caddy (snippet "clima_tomtom_key"), fora deste repositório.
+	# Só passam os tiles de trânsito e o cálculo de rota.
+	@tomtom path /tt/traffic/map/4/tile/* /tt/routing/1/calculateRoute/*
+	handle @tomtom {
+		route {
+			uri strip_prefix /tt
+			import clima_tomtom_key
+			reverse_proxy https://api.tomtom.com {
+				header_up Host api.tomtom.com
+			}
+		}
+	}
+
+	# Dados gerados no servidor (órbitas Starlink), fora da pasta que o deploy troca.
+	handle_path /data/* {
+		root * /opt/clima/data
+		header Cache-Control "public, max-age=1800"
+		file_server
+	}
+
+	file_server
+
+	log {
+		output file /var/log/caddy/clima.log
+	}
+}

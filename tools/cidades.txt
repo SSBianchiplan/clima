@@ -1,0 +1,98 @@
+# nome lon lat [meia-largura em graus, padrão 0.035]  — miolo urbano de cada cidade
+recife -34.900 -8.095 0.08
+salvador -38.480 -12.990 0.08
+bh -43.940 -19.930 0.08
+curitiba -49.270 -25.440 0.08
+floripa -48.530 -27.600 0.06
+manaus -60.020 -3.110 0.08
+belem -48.490 -1.445 0.08
+porto-alegre -51.215 -30.035 0.08
+sao-luis -44.285 -2.530 0.08
+maceio -35.720 -9.650 0.08
+natal -35.210 -5.815 0.08
+teresina -42.800 -5.090 0.08
+joao-pessoa -34.850 -7.120 0.08
+campo-grande -54.620 -20.465 0.08
+cuiaba -56.090 -15.600 0.08
+aracaju -37.055 -10.930 0.08
+vitoria -40.310 -20.300 0.05
+porto-velho -63.900 -8.760 0.08
+macapa -51.070 0.035 0.08
+rio-branco -67.810 -9.975 0.05
+boa-vista -60.690 2.820 0.05
+palmas -48.330 -10.200 0.05
+brasilia -47.900 -15.790 0.08
+brasilia-aguas-claras -48.030 -15.840 0.04
+fortaleza -38.520 -3.760 0.08
+rio-centro -43.180 -22.905
+rio-zonasul -43.195 -22.975
+rio-barra -43.365 -23.000 0.05
+rio-tijuca -43.235 -22.925
+niteroi -43.110 -22.900
+sao-goncalo -43.055 -22.825
+campinas -47.060 -22.905
+vila-velha -40.295 -20.340
+serra -40.270 -20.200
+santos -46.330 -23.960
+sjc -45.890 -23.200
+ribeirao-preto -47.810 -21.180
+uberlandia -48.280 -18.915
+sorocaba -47.455 -23.500
+londrina -51.165 -23.310
+maringa -51.935 -23.420
+joinville -48.845 -26.300
+juiz-de-fora -43.350 -21.765
+guarulhos -46.535 -23.455
+osasco -46.790 -23.535
+santo-andre -46.535 -23.660
+sao-bernardo -46.555 -23.700
+contagem -44.055 -19.930
+feira-de-santana -38.965 -12.265
+jaboatao -34.920 -8.180
+caxias-do-sul -51.180 -29.165
+ananindeua -48.385 -1.365
+aparecida-goiania -49.245 -16.820
+campina-grande -35.885 -7.225
+# mundo (Sul Global — cobertura do Google Open Buildings 2.5D)
+lima -77.030 -12.080
+bogota -74.060 4.660
+medellin -75.570 6.230
+santiago -70.620 -33.430
+buenos-aires -58.400 -34.600
+montevideu -56.170 -34.900
+cidade-mexico -99.160 19.420
+guadalajara -103.350 20.670
+monterrey -100.320 25.670
+caracas -66.880 10.490
+quito -78.490 -0.190
+panama -79.520 8.980
+sao-jose-cr -84.080 9.930
+santo-domingo -69.930 18.480
+havana -82.380 23.130
+lagos 3.400 6.450
+nairobi 36.820 -1.285
+joanesburgo 28.045 -26.150
+cidade-do-cabo 18.420 -33.920
+cairo 31.240 30.045
+casablanca -7.620 33.590
+acra -0.200 5.570
+adis-abeba 38.760 9.010
+luanda 13.240 -8.830
+maputo 32.580 -25.960
+mumbai 72.840 18.990
+delhi 77.215 28.630
+bangalore 77.600 12.970
+hyderabad 78.480 17.410
+chennai 80.250 13.060
+kolkata 88.360 22.570
+karachi 67.030 24.860
+lahore 74.330 31.540
+dhaka 90.410 23.780
+colombo 79.860 6.910
+jacarta 106.825 -6.200
+surabaya 112.740 -7.260
+manila 121.025 14.560
+bangkok 100.540 13.740
+ho-chi-minh 106.700 10.780
+hanoi 105.840 21.025
+kuala-lumpur 101.700 3.150
