@@ -19,9 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
--------------------------------------------------------------------------------
-This license covers the source code of this repository only. Third-party
-libraries in public/vendor/ keep their own licenses, and the data shown by the
-application comes from external sources under their own terms — see the
-"Fontes de dados" and "Licenças" sections of README.md.
