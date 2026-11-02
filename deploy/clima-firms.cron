@@ -1,0 +1,2 @@
+# GPlanSiS Clima — focos de calor NASA FIRMS (últimas 24 h, de hora em hora)
+41 * * * * root /usr/bin/python3 /opt/clima/bin/firms.py >/dev/null 2>&1

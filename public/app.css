@@ -2080,7 +2080,7 @@ body .tline.tl-min{padding:6px 12px!important}
 .rt-bases{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .rt-bases .lb{display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 4px 6px;border-radius:12px;border:1.5px solid transparent;background:var(--fill);color:var(--ink-2);font:600 11.5px var(--font);cursor:pointer}
 .rt-bases .lb img,.rt-bases .rb-rota{width:100%;height:38px;border-radius:8px;object-fit:cover;display:block}
-.rt-bases .rb-rota{background:linear-gradient(135deg,#3B3F66 0 30%,#6E73AC 30% 36%,#3B3F66 36% 62%,#5AC8FA 62% 67%,#2E4D49 67%)}
+.rt-bases .rb-rota,.satpanel .rb-rota{background:linear-gradient(135deg,#3B3F66 0 30%,#6E73AC 30% 36%,#3B3F66 36% 62%,#5AC8FA 62% 67%,#2E4D49 67%)}
 .rt-bases .lb[aria-pressed="true"]{border-color:var(--accent);color:var(--ink)}
 .nv-bases{position:absolute;right:70px;bottom:calc(112px + env(safe-area-inset-bottom,0px));width:300px;padding:12px;display:flex;flex-direction:column;gap:10px;z-index:2}
 .nv-bases b{font:700 14px var(--font)}
@@ -2088,7 +2088,7 @@ body .tline.tl-min{padding:6px 12px!important}
 /* mapa base: só a miniatura (nome na dica), todos do mesmo tamanho e alinhados */
 .lb > span{display:none!important}
 .satpanel .lb,.rt-bases .lb{width:64px!important;height:46px!important;padding:3px!important;margin:0!important;border-radius:12px!important;border:2px solid transparent!important;background:var(--fill)!important;display:block!important;box-sizing:border-box;flex:none;overflow:hidden;cursor:pointer}
-.satpanel .lb img,.rt-bases .lb img,.rt-bases .lb .rb-rota{width:100%!important;height:100%!important;border-radius:8px!important;object-fit:cover;display:block;margin:0}
+.satpanel .lb img,.satpanel .lb .rb-rota,.rt-bases .lb img,.rt-bases .lb .rb-rota{width:100%!important;height:100%!important;border-radius:8px!important;object-fit:cover;display:block;margin:0}
 .satpanel .lb[aria-pressed="true"],.rt-bases .lb[aria-pressed="true"]{border-color:var(--accent)!important;box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent)}
 .satpanel .lg-g .lg-b:has(.lb){display:flex;gap:8px;align-items:center}
 .rt-bases{display:flex!important;gap:8px;justify-content:flex-start}
@@ -2424,11 +2424,13 @@ body.mapview .sidebar .nav, body.mapview .sidebar .nav > *{pointer-events:auto}
 
 /* ---------- camadas do tempo (meteo.js) ---------- */
 .met-cv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
-.met-panel{position:fixed;right:16px;top:calc(var(--tbH,64px) + 16px);z-index:48;width:min(340px,calc(100vw - 24px));padding:12px 14px 12px;color:var(--ink);border-radius:20px!important;display:flex;flex-direction:column;gap:10px}
+.met-panel{position:fixed;right:16px;top:calc(var(--tbH,64px) + 16px);z-index:48;width:min(360px,calc(100vw - 24px));max-height:calc(100dvh - 110px);overflow:auto;overscroll-behavior:contain;padding:12px 14px 12px;color:var(--ink);border-radius:20px!important;display:flex;flex-direction:column;gap:10px}
 .met-panel header{display:flex;align-items:center;justify-content:space-between}.met-panel header b{display:flex;align-items:center;gap:8px;font:700 15px var(--font)}
 .met-x{width:30px;height:30px;border-radius:50%;border:0;background:var(--fill);color:var(--ink);display:grid;place-items:center;cursor:pointer}
-.met-lay{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
-.met-lay button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 4px;border-radius:14px;border:2px solid transparent;background:var(--fill);color:var(--ink);font:600 11.5px var(--font);cursor:pointer;text-align:center}
+/* camadas: uma linha de 5 botões compactos (nome completo na dica); Ctrl/⌘ + clique soma camadas */
+.met-lay{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.met-lay button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;padding:8px 2px 7px;border-radius:12px;border:1.5px solid transparent;background:var(--fill);color:var(--ink);font:600 10.5px var(--font);cursor:pointer;text-align:center;-webkit-touch-callout:none;user-select:none}
+.met-lay button span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .met-lay button[aria-pressed=true]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,var(--fill))}.met-lay button:disabled{opacity:.4}
 .met-time{display:flex;align-items:center;gap:8px}.met-time input{flex:1;accent-color:var(--accent)}.met-time b{font:700 12.5px var(--font-r);white-space:nowrap;min-width:92px;text-align:right}
 .met-time button{width:32px;height:32px;border-radius:50%;border:0;background:var(--accent);color:#fff;display:grid;place-items:center;cursor:pointer;flex:none}
@@ -2436,14 +2438,18 @@ body.mapview .sidebar .nav, body.mapview .sidebar .nav > *{pointer-events:auto}
 .met-leg div{position:relative;height:16px;margin-top:3px;font:600 10.5px var(--font-r);color:var(--ink-2)}.met-leg div span{position:absolute;transform:translateX(-50%)}
 .met-leg div span:first-child{transform:none}.met-leg div b{position:absolute;right:0;top:14px;font-size:10px}
 .met-leg small{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--ink-2)}.met-leg small u{width:14px;height:8px;border-radius:2px;display:inline-block}
-.met-chk{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2)}.met-hint{margin:0;font-size:12.5px;color:var(--ink-2)}
-.met-mod{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2)}.met-mod button{padding:4px 10px;border-radius:10px;border:0;background:var(--fill);color:var(--ink);font:600 11.5px var(--font)}
+.met-chk{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2)}.met-hint{margin:-2px 0 0;font-size:11.5px;line-height:1.45;color:var(--ink-2)}
+.met-kbd{opacity:.85}.met-hint kbd{font:600 10.5px var(--font);padding:1px 5px;border-radius:5px;background:var(--fill);border:1px solid color-mix(in srgb,var(--ink) 18%,transparent)}
+.met-legs{display:flex;flex-direction:column;gap:9px}.met-leg-t{display:flex;align-items:center;gap:6px;margin-bottom:5px;font:700 11.5px var(--font);color:var(--ink)}.met-leg-t em{font-style:normal;font-weight:600;color:var(--ink-2)}
+.met-mod{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--ink-2)}
+.met-seg{display:inline-flex;gap:2px;padding:3px;border-radius:11px;background:var(--fill)}.met-mod button{padding:5px 12px;border-radius:8px;border:0;background:transparent;color:var(--ink);font:600 11.5px var(--font);cursor:pointer}
 .met-mod button[aria-pressed=true]{background:var(--accent);color:#fff}.met-mod button:disabled{opacity:.45}
 .met-src{font-size:10.5px;color:var(--ink-2)}
 .met-pop .maplibregl-popup-content{background:var(--glass,rgba(20,24,32,.85));color:var(--ink);border-radius:12px;padding:8px 12px;display:flex;flex-direction:column;gap:2px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 .met-pop b{font:700 12px var(--font)}.met-pop span{font:800 15px var(--font-r)}.met-pop small{font-size:10.5px;color:var(--ink-2)}
+.met-pop .met-pl{margin:0;display:flex;align-items:baseline;justify-content:space-between;gap:12px}.met-pop .met-pl em{font:600 11.5px var(--font);font-style:normal;color:var(--ink-2)}.met-pop .met-pl span{font-size:13.5px}
 .met-pop .maplibregl-popup-tip{display:none}
-@media (max-width:760px){ .met-panel{top:auto;bottom:calc(150px + env(safe-area-inset-bottom,0px));right:12px;left:12px;width:auto;max-height:55dvh;overflow:auto} .met-lay{grid-template-columns:repeat(5,1fr)} .met-lay button span{font-size:10px} }
+@media (max-width:760px){ .met-panel{top:auto;bottom:calc(150px + env(safe-area-inset-bottom,0px));right:12px;left:12px;width:auto;max-height:55dvh;overflow:auto} .met-lay button span{font-size:10px} }
 
 /* ---------- ponto azul ao vivo (gps.js) ---------- */
 .gps-dot{width:22px;height:22px;position:relative;pointer-events:none}
@@ -2606,6 +2612,9 @@ body.lv2 #lvChipsM,body.lv2 #lvLayers{display:flex}
   body.lv-r .pov-hint{margin-left:36px}
   /* menu de satélite antigo (botões laterais do POV/voo) nunca por baixo do trilho */
   body.lv-r.pov .lv-chips,body.lv-r.pov #lvSearch{opacity:.0;pointer-events:none}
+  /* invisíveis também para o clique: o "#lvTop > *" (com id) devolvia o clique aos chips, e o chip Tempo,
+     escondido atrás de "Sair do POV", abria as camadas do tempo no lugar de sair */
+  body.lv-r.pov #lvTop .lv-chips,body.lv-r.pov #lvTop .lv-chips *,body.lv-r.pov #lvSearch,body.lv-r.pov #lvSearch *{pointer-events:none!important;visibility:hidden}
 }
 
 /* ---------- câmera ao vivo: cartão médio flutuante (widget) ---------- */

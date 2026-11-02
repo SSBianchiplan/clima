@@ -291,7 +291,7 @@ function layersUI(){
     ["br","bridge","Viadutos, pontes e vias elevadas 3D", () => window.Bridges?.isOn?.(), v => window.Bridges?.setOn?.(v)],
     ["tt","traffic","Trânsito ao vivo", () => window.Rotas?.isTraffic?.(), v => window.Rotas?.setTraffic?.(v)]];
   el.innerHTML = `<header><b>${ico("layers", 18)} Camadas do mapa</b><button class="dn-ib" id="dvLyX" aria-label="Fechar">${ico("x", 16)}</button></header>
-    <h4>Mapa base</h4><div class="dv-lyb">${B.map(([k, n]) => `<button data-lb="${k}" aria-pressed="${k === base}">${k === "rota" ? `<i class="rb-rota"></i>` : `<img src="${S0.thumb?.(k) || ""}" alt="" loading="lazy">`}<span>${n}</span></button>`).join("")}</div>
+    <h4>Mapa base</h4><div class="dv-lyb">${B.map(([k, n]) => `<button data-lb="${k}" aria-pressed="${k === base}">${k === "rota" ? (window.Rotas?.baseThumb?.("rota") || `<i class="rb-rota"></i>`) : `<img src="${S0.thumb?.(k) || ""}" alt="" loading="lazy">`}<span>${n}</span></button>`).join("")}</div>
     <h4>Por cima</h4><div class="dv-lyt">${T.map(([k, ic, n, get]) => `<button data-lt="${k}" aria-pressed="${!!get()}">${ico(ic, 18)}<span>${n}</span><i></i></button>`).join("")}</div>
     <small class="dv-lyh">Nomes com a câmera rente ao chão deixam o mapa mais lento.</small>`;
   document.body.appendChild(el);

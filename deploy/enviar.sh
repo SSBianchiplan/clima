@@ -29,6 +29,12 @@ if [[ "${PRIMEIRA:-0}" == 1 ]]; then
   echo "==> coletor de voos (cron 3 min)"
   $SSH "$VPS" "cat > $APP/bin/air-collector.py && chmod 755 $APP/bin/air-collector.py" < deploy/air-collector.py
   $SSH "$VPS" "cat > /etc/cron.d/clima-air && chmod 644 /etc/cron.d/clima-air" < deploy/clima-air.cron
+  echo "==> queimadas NASA FIRMS (cron 1 h + primeira carga)"
+  # chave da NASA: arquivo só local (deploy/firms.key, fora de versionamento), legível só pelo root no servidor
+  if [[ -f deploy/firms.key ]]; then $SSH "$VPS" "umask 077; mkdir -p $APP/bin && cat > $APP/bin/firms.key" < deploy/firms.key; fi
+  $SSH "$VPS" "cat > $APP/bin/firms.py && chmod 755 $APP/bin/firms.py" < deploy/firms.py
+  $SSH "$VPS" "cat > /etc/cron.d/clima-firms && chmod 644 /etc/cron.d/clima-firms" < deploy/clima-firms.cron
+  $SSH "$VPS" "[ -s $APP/bin/firms.key ] && /usr/bin/python3 $APP/bin/firms.py; ls -la $APP/data/firms.json || true"
   echo "==> caddy"
   # Se a validação falhar, o Caddyfile volta ao backup e o Caddy nem é recarregado.
   # chave da TomTom: arquivo só local (deploy/clima-tomtom.caddy, fora de versionamento), legível só pelo caddy

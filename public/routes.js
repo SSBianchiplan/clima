@@ -469,7 +469,17 @@ R.nb = store.get("rt-navbase2", "sat");   // navegação começa no Planeta Águ
 const BASES = [["rota","Rota"],["sat","Satélite"],["map","Mapa"],["topo","Relevo"]];
 const NV_FLAT = ["nv-bg","nv-park","nv-green","nv-water","nv-water-e","nv-park-e","nv-rcase","nv-road","nv-lane"];
 const RASTER = {sat:"earth", map:"base-map", topo:"base-topo"};
-const bThumb = k => k === "rota" ? `<i class="rb-rota"></i>` : `<img src="${window.Sat?.thumb?.(k) || ""}" alt="" loading="lazy">`;
+// miniatura do estilo Rota desenhada nas cores reais dele (tema claro/escuro): água, parque, ruas, prédios e a linha da rota
+function rotaThumb(){
+  const c = PAL[dark() ? "dark" : "light"];
+  return `<svg class="rb-rota" viewBox="0 0 64 40" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="64" height="40" fill="${c.bg}"/>
+    <path d="M0 27c8-2 13 3 21 1s9-6 15-5v17H0z" fill="${c.water}"/><path d="M0 27c8-2 13 3 21 1s9-6 15-5" fill="none" stroke="${c.waterE}" stroke-width=".8"/>
+    <rect x="41" y="3" width="15" height="11" rx="2" fill="${c.park}"/>
+    <g fill="${c.bld[1]}"><rect x="27" y="4" width="5" height="5" rx=".6"/><rect x="33" y="4" width="4" height="7" rx=".6"/><rect x="45" y="20" width="6" height="5" rx=".6"/><rect x="53" y="18" width="5" height="8" rx=".6"/><rect x="8" y="8" width="6" height="5" rx=".6"/></g>
+    <g fill="none" stroke-linecap="round"><path d="M-2 18 66 12M24 -2l4 44M39 -2l-2 44M58 -2l-6 44" stroke="${c.rcase}" stroke-width="3.6"/><path d="M-2 18 66 12M24 -2l4 44M39 -2l-2 44M58 -2l-6 44" stroke="${c.road}" stroke-width="2.4"/>
+    <path d="M6 40 26 16l12-1 9 13 19-3" stroke="#0A3A73" stroke-width="4.2"/><path d="M6 40 26 16l12-1 9 13 19-3" stroke="#4FC3F7" stroke-width="2.6"/></g></svg>`;
+}
+const bThumb = k => k === "rota" ? rotaThumb() : `<img src="${window.Sat?.thumb?.(k) || ""}" alt="" loading="lazy">`;
 const baseRow = (attr, cur) => `<div class="rt-bases" role="group" aria-label="Mapa base">${BASES.map(([k, n]) => `<button class="lb" ${attr}="${k}" aria-pressed="${k === cur}" title="${n}" aria-label="${n}">${bThumb(k)}<span>${n}</span></button>`).join("")}</div>`;
 function applyNavBase(){
   const m = window.Sat?.map(); if(!m || !saved) return;
@@ -889,5 +899,5 @@ function setTraffic(on){
 }
 if(R.traffic) setTimeout(() => setTraffic(true), 2500);
 
-window.Rotas = {trafficCfg, open, close, to: p => { open(); set("b", p); }, from: p => { open(); set("a", p); }, setTraffic, isTraffic: () => R.traffic, setLook, isLook: () => R.look, isOpen: () => !!$("rtPanel") && !$("rtPanel").hidden};
+window.Rotas = {trafficCfg, open, close, to: p => { open(); set("b", p); }, from: p => { open(); set("a", p); }, setTraffic, isTraffic: () => R.traffic, setLook, isLook: () => R.look, bases: () => BASES, baseThumb: bThumb, pickBase, curBase, isOpen: () => !!$("rtPanel") && !$("rtPanel").hidden};
 })();

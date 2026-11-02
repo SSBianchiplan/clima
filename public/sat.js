@@ -39,6 +39,26 @@ const TERRARIUM_SRC = "https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{
 // O relevo aberto (Mapzen/SRTM) tem cinco tipos de defeito que viram paredões, buracos e "montanhas" no 3D.
 // O protocolo "dem0://" baixa cada tile e corrige tudo antes do MapLibre ver (demClean, abaixo).
 const TERRARIUM = "dem0://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png";
+// Camada opcional "Relevo fino" (desligada por padrão): Mapterhorn — Copernicus GLO-30 no mundo todo e lidar nacionais
+// onde há, sem chave. Tiles de 512 px: o quadrante de um tile z−1 tem exatamente os pixels do tile de 256 px do zoom z,
+// então o MapLibre e o demClean veem a mesma grade da AWS. 404 no Mapterhorn é mar (0 m); outra falha volta para a AWS.
+const MT_SRC = "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp";
+const TERRARIUM_MT = "dem0://mt/{z}/{x}/{y}.png";
+async function demFetch(url, z, x, y, mt, signal){
+  if(mt && z >= 1){
+    try{
+      const r = await fetch(MT_SRC.replace("{z}", z-1).replace("{x}", x >> 1).replace("{y}", y >> 1), {signal});
+      if(r.ok || r.status === 404){
+        const c = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(256, 256) : Object.assign(document.createElement("canvas"), {width:256, height:256}), g = c.getContext("2d");
+        if(r.ok) g.drawImage(await createImageBitmap(await r.blob()), (x & 1)*256, (y & 1)*256, 256, 256, 0, 0, 256, 256);   // recorte 1:1, sem reamostrar
+        else { g.fillStyle = "rgb(128,0,0)"; g.fillRect(0, 0, 256, 256); }   // terrarium de 0 m
+        return c;
+      }
+    }catch(e){ if(signal?.aborted) throw e; }
+  }
+  const r = await fetch(url, {signal}); if(!r.ok) throw new Error("HTTP " + r.status);
+  return await createImageBitmap(await r.blob());
+}
 // 1) Piso por região. No mar o piso é 0 m (some a batimetria colada à praia). Terra que fica de verdade abaixo
 // do nível do mar mantém a altura real, e lagos que vieram com o fundo medido ficam na superfície da água.
 // Caixa [oeste, sul, leste, norte] ou círculo {c:[lon,lat], km}; a primeira que contém o ponto vale.
@@ -291,15 +311,14 @@ async function demOmt(z, x, y, N){
      fora da thread principal, e o tile pronto fica guardado no Cache Storage (próximas visitas: instantâneo). */
   const VER = "dem4";
   const src = `self.window = self; importScripts(${JSON.stringify(location.origin + "/vendor/pmtiles.js")});
-const OVERTURE_FALLBACK = ${JSON.stringify(OVERTURE_FALLBACK)}; const DEM_FLOORS = ${JSON.stringify(DEM_FLOORS)};
+const OVERTURE_FALLBACK = ${JSON.stringify(OVERTURE_FALLBACK)}; const DEM_FLOORS = ${JSON.stringify(DEM_FLOORS)}; const MT_SRC = ${JSON.stringify(MT_SRC)};
 let OV_REL = OVERTURE_FALLBACK, ovPM = null, omtTiles = null, cv = null;
-${[demFloor, demWin, demBlobs, demClean, mvtLayers, mvtFill, mvtMask, demBuildings, demOmt].map(String).join("\n")}
-async function work(url, z, x, y){
-  const key = "https://dem0.local/${VER}/" + z + "/" + x + "/" + y; let cache = null;
+${[demFloor, demWin, demBlobs, demClean, mvtLayers, mvtFill, mvtMask, demBuildings, demOmt, demFetch].map(String).join("\n")}
+async function work(url, z, x, y, mt){
+  const key = "https://dem0.local/${VER}" + (mt ? "mt" : "") + "/" + z + "/" + x + "/" + y; let cache = null;
   try{ cache = await caches.open("clima-dem0-${VER}"); const hit = await cache.match(key); if(hit) return await hit.arrayBuffer(); }catch(e){}
   const bmP = demBuildings(z, x, y, 256), omP = demOmt(z, x, y, 256);
-  const r = await fetch(url); if(!r.ok) throw new Error("HTTP " + r.status);
-  const bmp = await createImageBitmap(await r.blob());
+  const bmp = await demFetch(url, z, x, y, mt);
   cv = cv || new OffscreenCanvas(256, 256); if(cv.width !== bmp.width){ cv.width = bmp.width; cv.height = bmp.height; }
   const g = cv.getContext("2d", {willReadFrequently:true}); g.drawImage(bmp, 0, 0);
   const im = g.getImageData(0, 0, cv.width, cv.height), d = im.data, W = cv.width, H = cv.height, E = new Float32Array(W*H);
@@ -313,7 +332,7 @@ async function work(url, z, x, y){
   return await blob.arrayBuffer();
 }
 onmessage = async e => { const q = e.data; if(q.rel) OV_REL = q.rel;
-  try{ const buf = await work(q.url, q.z, q.x, q.y); postMessage({id:q.id, buf}, [buf]); }catch(err){ postMessage({id:q.id, err:String(err && err.message || err)}); } };`;
+  try{ const buf = await work(q.url, q.z, q.x, q.y, q.mt); postMessage({id:q.id, buf}, [buf]); }catch(err){ postMessage({id:q.id, err:String(err && err.message || err)}); } };`;
   let pool = [];
   try{ const u = URL.createObjectURL(new Blob([src], {type:"text/javascript"}));
     const n = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 4) - 1));
@@ -322,17 +341,16 @@ onmessage = async e => { const q = e.data; if(q.rel) OV_REL = q.rel;
   pool.forEach(w => w.onmessage = e => { const cb = waiting.get(e.data.id); if(!cb) return; waiting.delete(e.data.id); e.data.err ? cb.rej(new Error(e.data.err)) : cb.res(e.data.buf); });
   let cv = null;
   maplibregl.addProtocol("dem0", async (params, abort) => {
-    const [z, x, y] = params.url.match(/(\d+)\/(\d+)\/(\d+)\.png/).slice(1).map(Number), url = "https://" + params.url.slice(7);
+    const [z, x, y] = params.url.match(/(\d+)\/(\d+)\/(\d+)\.png/).slice(1).map(Number), mt = params.url.startsWith("dem0://mt/");
+    const url = mt ? TERRARIUM_SRC.replace("{z}", z).replace("{x}", x).replace("{y}", y) : "https://" + params.url.slice(7);   // no Mapterhorn, a AWS fica de reserva
     if(pool.length){
       const id = ++seq, w = pool[rr++ % pool.length];
-      const buf = await new Promise((res, rej) => { waiting.set(id, {res, rej}); w.postMessage({id, url, z, x, y, rel:OV_REL}); });
+      const buf = await new Promise((res, rej) => { waiting.set(id, {res, rej}); w.postMessage({id, url, z, x, y, mt, rel:OV_REL}); });
       return {data: buf};
     }
     // sem Worker (navegador antigo): mesmo tratamento na thread principal
     const bmP = demBuildings(z, x, y, 256), omP = demOmt(z, x, y, 256);
-    const r = await fetch(url, {signal: abort?.signal});
-    if(!r.ok) throw new Error(`HTTP ${r.status}`);
-    const bmp = await createImageBitmap(await r.blob());
+    const bmp = await demFetch(url, z, x, y, mt, abort?.signal);
     cv = cv || (typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(256, 256) : Object.assign(document.createElement("canvas"), {width:256, height:256}));
     if(cv.width !== bmp.width){ cv.width = bmp.width; cv.height = bmp.height; }
     const g = cv.getContext("2d", {willReadFrequently:true}); g.drawImage(bmp, 0, 0);
@@ -404,7 +422,7 @@ const isClear = () => !!PRODUCTS[P.prod].clear;
 const P = {
   map:null, goes:null, radar:null, labels:null, here:null, loc:null,
   prod: store.get("sat-prod","geocolor"), showRadar: store.get("sat-radar",false), showStar: store.get("sat-star",true), bg: store.get("sat-bg",true),
-  hgt: store.get("sat-hgt", false), fold: store.get("sat-fold", true), base: store.get("sat-base", "sat"), ovRail: store.get("sat-ov-rail", false), ovBike: store.get("sat-ov-bike", false), proj: store.get("sat-proj", "globe"), air: store.get("sat-air", false), planes: new Map(), spc: store.get("sat-spc", false), nameCls: new Set(store.get("sat-namecls", ["country","state","city","town","village","suburb","quarter","neighbourhood","roads","water","peaks","borders"])), alt: store.get("sat-alt", false), names: store.get("sat-names", true), bld: store.get("sat-bld", true), measure:null,
+  hgt: store.get("sat-hgt", false), fold: store.get("sat-fold", true), base: store.get("sat-base", "sat"), ovRail: store.get("sat-ov-rail", false), ovBike: store.get("sat-ov-bike", false), proj: store.get("sat-proj", "globe"), air: store.get("sat-air", false), planes: new Map(), spc: store.get("sat-spc", false), nameCls: new Set(store.get("sat-namecls", ["country","state","city","town","village","suburb","quarter","neighbourhood","roads","water","peaks","borders"])), alt: store.get("sat-alt", false), mt: store.get("sat-mt", false), names: store.get("sat-names", true), bld: store.get("sat-bld", true), measure:null,
   time:null, frames:[], anim:null, sats:[], starAt:0, overhead:{n:0, list:[]}, canvas:null, timer:null, radarHost:null, radarPath:null
 };
 const inSat = () => document.body.classList.contains("mapview");
@@ -536,7 +554,7 @@ function prefetchAround(m){
   omtTpl.then(tpl => {
     const more = [];
     if(tpl && zm >= 4) for(const [z, x, y] of tileRing(m, Math.min(14, Math.floor(zm)), 1, 60)) more.push(tpl.replace("{z}", z).replace("{x}", x).replace("{y}", y));
-    if(m.getTerrain() && zm >= 5) for(const [z, x, y] of tileRing(m, Math.min(12, Math.floor(zm) + 1), 1, 30)) more.push(TERRARIUM_SRC.replace("{z}", z).replace("{x}", x).replace("{y}", y));
+    if(m.getTerrain() && zm >= 5) for(const [z, x, y] of tileRing(m, Math.min(12, Math.floor(zm) + 1), 1, 30)) more.push(P.mt ? MT_SRC.replace("{z}", z-1).replace("{x}", x >> 1).replace("{y}", y >> 1) : TERRARIUM_SRC.replace("{z}", z).replace("{x}", x).replace("{y}", y));
     pf.q = list.concat(more, pf.q.filter(u => /\/tile\/[0-5]\//.test(u))); pfPump();
   });
   // prédios 3D (Overture, z12–14): o anel em volta fica na memória, pronto para quando o mapa andar
@@ -670,8 +688,8 @@ function init(){
         "b-topo":{type:"raster", tileSize:256, maxzoom:19, attribution:"Relevo © Esri, USGS, OpenStreetMap", tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"]},
         "o-rail":{type:"raster", tileSize:256, maxzoom:18, attribution:"Transporte © OpenRailwayMap (CC-BY-SA)", tiles:["https://a.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png","https://b.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png"]},
         "o-bike":{type:"raster", tileSize:256, maxzoom:18, attribution:"Ciclovias © CyclOSM / OpenStreetMap", tiles:["https://a.tile-cyclosm.openstreetmap.fr/cyclosm-lite/{z}/{x}/{y}.png","https://b.tile-cyclosm.openstreetmap.fr/cyclosm-lite/{z}/{x}/{y}.png"]},
-        dem:{type:"raster-dem", tileSize:256, maxzoom:12, encoding:"terrarium", attribution:"Relevo: AWS Terrain Tiles (Mapzen)", tiles:[TERRARIUM]},
-        dem2:{type:"raster-dem", tileSize:256, maxzoom:13, encoding:"terrarium", tiles:[TERRARIUM]},
+        dem:{type:"raster-dem", tileSize:256, maxzoom:12, encoding:"terrarium", attribution:"Relevo: AWS Terrain Tiles (Mapzen)", tiles:[P.mt ? TERRARIUM_MT : TERRARIUM]},
+        dem2:{type:"raster-dem", tileSize:256, maxzoom:13, encoding:"terrarium", tiles:[P.mt ? TERRARIUM_MT : TERRARIUM]},
         ...(contourTiles ? {contours:{type:"vector", tiles:contourTiles, maxzoom:15}} : {}),
         omt:{type:"vector", url:"https://tiles.openfreemap.org/planet", attribution:"Nomes © OpenStreetMap · OpenFreeMap"},
         cristo:{type:"geojson", data:cristoGeo()},
@@ -917,8 +935,13 @@ function terrainFit(){
 // liga/desliga o Planeta Água; relevo 3D só na página de satélite (no fundo pesaria à toa)
 const N_IDS = ["n-road","n-bnd","n-house","n-roadname","n-poi","n-water","n-river","n-peak","n-air","n-place"];
 function setBase(b){ P.base = b; store.set("sat-base", b); applyMode(); panel(); footer(); }
+// mapa base: a mesma lista, as mesmas miniaturas e a mesma escolha em todo o sistema (Rota · Satélite · Mapa · Relevo, de routes.js)
+const BASES = () => window.Rotas?.bases?.() || [["sat","Satélite"],["map","Mapa"],["topo","Relevo"]];
+const curBase = () => window.Rotas?.curBase?.() || P.base;
+const pickBase = k => window.Rotas?.pickBase ? window.Rotas.pickBase(k) : setBase(k);
+const baseThumb = k => window.Rotas?.baseThumb?.(k) || `<img src="${thumb(k)}" alt="" loading="lazy">`;
 // ícones da barra rápida de camadas (conjunto de icons.js)
-const LQ_ICO = {satNames:"type", satAlt:"mountain", satBld:"box3d", br3d:"bridge", ovRail:"train", ovBike:"bike", satAir:"plane", satRadar:"rain", satStar:"sparkle", names2:"tag", places:"pin", hgt:"city", apt:"takeoff", cams:"video", volc:"volcano", temp:"landmark", traffic:"traffic", routes:"compass", drive:"bus", tour:"heli", met:"wind"};
+const LQ_ICO = {satNames:"type", satAlt:"altbands", satMt:"finerelief", fire:"fire", satBld:"box3d", br3d:"bridge", ovRail:"train", ovBike:"bike", satAir:"plane", satRadar:"rain", satStar:"sparkle", names2:"tag", places:"pin", hgt:"city", apt:"takeoff", cams:"video", volc:"volcano", temp:"landmark", traffic:"traffic", routes:"compass", drive:"car", tour:"drone", met:"wind"};
 function setOv(k, on){ P[k] = on; store.set(k==="ovRail" ? "sat-ov-rail" : "sat-ov-bike", on); applyMode(); panel(); }
 // miniatura do mapa do lugar atual (um tile real da camada)
 function thumb(kind){
@@ -1166,6 +1189,10 @@ async function elevAt(lng, lat){
 }
 const fmtAlt = e => e==null ? "—" : e < 0 ? `mar (${Math.round(e)} m)` : `${Math.round(e).toLocaleString("pt-BR")} m`;
 function setAlt(on){ P.alt = on; store.set("sat-alt", on); applyMode(); panel(); }
+// Relevo fino (Mapterhorn): troca só a origem dos tiles do relevo 3D, sombreamento e cores de altitude; curvas e altitude do ponto seguem na AWS
+function setMt(on){ P.mt = on; store.set("sat-mt", on);
+  for(const id of ["dem","dem2"]) try{ P.map?.getSource(id)?.setTiles([on ? TERRARIUM_MT : TERRARIUM]); }catch(e){}
+  panel(); footer(); }
 // clique num marco: altura, andares, ano e link para o Wikidata / Wikipédia
 function landmarkCard(f){
   const p = f.properties, [lon, lat] = f.geometry.coordinates;
@@ -1614,7 +1641,7 @@ function povTools(){
       if(k==="places") window.Places?.setOn(!window.Places.isOn());
       if(k==="radar") setRadar(!P.showRadar);
       if(k==="air") setAir(!P.air);
-      if(k.startsWith("base-")) setBase(k.slice(5));
+      if(k.startsWith("base-")) pickBase(k.slice(5));
       if(k==="zin") P.fov = Math.max(8, (P.fov||36.87)/1.3);
       if(k==="zout") P.fov = Math.min(80, (P.fov||36.87)*1.3);
       if(k==="front"){ P.look = {yaw:0, pitch:0}; P.fov = 36.87; }
@@ -1630,7 +1657,7 @@ function povTools(){
       ${b("radar","☔","Radar de chuva", P.showRadar)}${b("air","✈","Outras aeronaves", P.air)}${b("star","✦","Starlink", vis("star"))}
       ${b("rail","🚇","Transporte público", vis("ov-rail"))}${b("bike","🚲","Ciclovias", vis("ov-bike"))}${b("places","📍","Lugares", window.Places?.isOn())}</div>
     <div class="pt-g"><small>Mapa base</small>
-      ${b("base-sat","🛰","Satélite", P.base==="sat")}${b("base-map","🗺","Mapa", P.base==="map")}${b("base-topo","⛰","Relevo", P.base==="topo")}</div>
+      ${BASES().map(([k,n])=>b("base-"+k, {rota:"🧭", sat:"🛰", map:"🗺", topo:"⛰"}[k], n, curBase()===k)).join("")}</div>
     <div class="pt-g"><small>Lente</small>
       ${b("zout","－","Afastar")}${b("zin","＋","Aproximar (zoom)")}<span class="pt-fov">campo ${Math.round(P.fov||36.87)}°</span></div>
     <div class="pt-g"><small>Olhar</small>
@@ -1663,6 +1690,7 @@ function followBar(){
       if(b.dataset.fb==="pov"){ const h = P.pov || P.follow || P.sel; if(P.pov) povStop(); else povStart(h); }
       if(b.dataset.fb==="close"){ povStop(); clearRoute(); } }); }
   bar.hidden = false;
+  if(bar.matches(":active")) return;   // botão apertado: redesenhar agora trocaria o botão e o clique se perderia
   const p = P.planes.get(hx), rt = P.followInfo?.rt, ac = P.followInfo?.ac, fol = P.follow === hx;
   const o = rt ? [rt.origin.longitude, rt.origin.latitude] : null, d = rt ? [rt.destination.longitude, rt.destination.latitude] : null;
   const tot = rt ? hav(o,d) : 0, done = rt ? hav(o,[p.lon,p.lat]) : 0, pct = rt ? Math.max(0, Math.min(100, done/Math.max(1,tot)*100)) : 0;
@@ -1681,7 +1709,7 @@ function followBar(){
       <button class="mbtn${fol?" on":""}" data-fb="stop"${P.pov?" hidden":""}>${fol ? "Parar de seguir" : "Seguir avião"}</button>
       <button class="lyr-b" data-fb="close" title="Fechar" aria-label="Fechar">✕</button></div>`;
 }
-setInterval(()=>{ if(P.follow || P.sel) followBar(); }, 2000);
+setInterval(()=>{ if(P.pov || P.follow || P.sel) followBar(); }, 2000);
 addEventListener("hashchange", followBar);
 setInterval(()=>{ if(!P.follow || !P.planes.has(P.follow) || !inSat()) return; const p = P.planes.get(P.follow), dt = (Date.now()-p.at)/1000, d = p.gnd ? 0 : p.gs*1852/3600*dt, tr = p.track*Math.PI/180;
   P.map.easeTo({center:[p.lon + d*Math.sin(tr)/(111320*Math.cos(p.lat*Math.PI/180)), p.lat + d*Math.cos(tr)/110540], duration:900, easing:x=>x}); }, 1000);
@@ -1777,11 +1805,12 @@ function footer(){
   if(P.base==="topo") parts.push(`<b>Relevo</b> Esri World Topographic Map`);
   if(P.ovRail) parts.push(`<b>Transporte</b> <span>OpenRailwayMap</span>`);
   if(P.ovBike) parts.push(`<b>Ciclovias</b> <span>CyclOSM</span>`);
-  if(isClear()) parts.push(`<b>Planeta Água</b> imagem Esri World Imagery (mosaico sem nuvens) · relevo AWS Terrain Tiles`);
+  if(isClear()) parts.push(`<b>Planeta Água</b> imagem Esri World Imagery (mosaico sem nuvens) · relevo ${P.mt ? "Mapterhorn (Copernicus GLO-30)" : "AWS Terrain Tiles"}`);
   else if(P.times) parts.push(`<b>Satélites</b> GOES-19 ${hm(P.times[2])} · GOES-18 ${hm(P.times[1])} · Himawari-9 ${hm(P.times[0])} <span>NOAA · JMA via NASA GIBS</span>`);
   else parts.push(`<b>Satélites</b> carregando…`);
   if(!isClear() && P.prod==="geocolor") parts.push(`<b>Base global</b> VIIRS NOAA-20 ${new Date(Date.now()-864e5).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})} <span>NASA GIBS</span>`);
   if(P.showRadar) parts.push(`<b>Radar</b> <span>RainViewer</span>`);
+  const fm = window.Fires?.isOn() && window.Fires.meta(); if(fm) parts.push(`<b>Queimadas</b> ${fm.n.toLocaleString("pt-BR")} focos em 24 h, até ${hm(fm.t)} <span>NASA FIRMS (VIIRS)</span>`);
   if(P.air) parts.push(`<b>Aeronaves</b> ${P.planes.size} no raio <span>adsb.lol (ODbL) · adsbdb · trajetos OpenSky Network</span>`);
   if(P.tleAt) parts.push(`<b>Starlink</b> órbitas de ${hm(P.tleAt)} <span>CelesTrak</span>`);
   const f = C.S.fetchedAt; if(f) parts.push(`<b>Previsão</b> ${hm(f)} <span>Open-Meteo</span>`);
@@ -1827,7 +1856,7 @@ function panel(quick){
     <div class="lyr-head">
       ${window.modeSeg ? window.modeSeg("map") : ""}
       <div class="lyr-title"><b>Camadas</b><small id="satTime"></small></div>
-      ${P.fold ? `<div class="lyr-quick">${[["satNames","Aa","Nomes e ruas",P.names],["satAlt","▲","Altitude",P.alt],["satBld","▦","Prédios 3D",P.bld],["br3d","▤","Vias elevadas, viadutos e pontes 3D",window.Bridges?.isOn()],["ovRail","🚇","Transporte público",P.ovRail],["ovBike","🚲","Ciclovias",P.ovBike],["satAir","✈","Aeronaves",P.air],["satRadar","☔","Radar de chuva",P.showRadar],["satStar","✦","Starlink",P.showStar],["names2","🏷","Escolher nomes: cidades, bairros, ruas…",false],["places","📍","Lugares (pontos turísticos, templos…)",window.Places?.isOn()],["hgt","🏙","Altura das construções",P.hgt],["apt","🛫","Aeroportos (clique para o simulador de voo)",window.Sim?.isOn()],["cams","🎥","Câmeras ao vivo",window.Cams?.isOn()],["volc","🌋","Vulcões",window.Geo?.isOn("volc")],["temp","🏛","Templos antigos",window.Geo?.isOn("temp")],["traffic","🚦","Trânsito ao vivo (TomTom)",window.Rotas?.isTraffic()],["routes","🧭","Rotas e navegação",window.Rotas?.isOpen()],["drive","🚌","Dirigir / andar a pé: saídas nas rodoviárias",window.Drive?.isOn()],["tour","🚁","Drone (voo tour livre): decolar da sua localização ou de um ponto no mapa",false],["met","💨","Camadas do tempo: vento, chuva e trovoadas, temperatura, ondas, chuva acumulada (GFS)",window.Meteo?.isOn()]].map(([id,ic,t,on])=>`<button type="button" class="lq" data-q="${id}" aria-pressed="${!!on}" title="${t}" aria-label="${t}">${window.Ico?.(LQ_ICO[id], 20) || ic}</button>`).join("")}</div>` : ""}
+      ${P.fold ? `<div class="lyr-quick">${[["satNames","Aa","Nomes e ruas",P.names],["satAlt","▲","Altitude",P.alt],["satMt","⛰","Relevo fino (Mapterhorn: Copernicus GLO-30 e lidar)",P.mt],["satBld","▦","Prédios 3D",P.bld],["br3d","▤","Vias elevadas, viadutos e pontes 3D",window.Bridges?.isOn()],["ovRail","🚇","Transporte público",P.ovRail],["ovBike","🚲","Ciclovias",P.ovBike],["satAir","✈","Aeronaves",P.air],["satRadar","☔","Radar de chuva",P.showRadar],["fire","🔥","Queimadas: focos de calor das últimas 24 h (NASA FIRMS)",window.Fires?.isOn()],["satStar","✦","Starlink",P.showStar],["names2","🏷","Escolher nomes: cidades, bairros, ruas…",false],["places","📍","Lugares (pontos turísticos, templos…)",window.Places?.isOn()],["hgt","🏙","Altura das construções",P.hgt],["apt","🛫","Aeroportos (clique para o simulador de voo)",window.Sim?.isOn()],["cams","🎥","Câmeras ao vivo",window.Cams?.isOn()],["volc","🌋","Vulcões",window.Geo?.isOn("volc")],["temp","🏛","Templos antigos",window.Geo?.isOn("temp")],["traffic","🚦","Trânsito ao vivo (TomTom)",window.Rotas?.isTraffic()],["routes","🧭","Rotas e navegação",window.Rotas?.isOpen()],["drive","🚌","Dirigir / andar a pé: saídas nas rodoviárias",window.Drive?.isOn()],["tour","🚁","Drone (voo tour livre): decolar da sua localização ou de um ponto no mapa",false],["met","💨","Camadas do tempo: vento, chuva e trovoadas, temperatura, ondas, chuva acumulada (GFS)",window.Meteo?.isOn()]].map(([id,ic,t,on])=>`<button type="button" class="lq" data-q="${id}" aria-pressed="${!!on}" title="${t}" aria-label="${t}">${window.Ico?.(LQ_ICO[id], 20) || ic}</button>`).join("")}</div>` : ""}
       <div class="lyr-act">
         ${isClear() && P.proj!=="2d" ? ib("sat3d", P.map && P.map.getPitch()>5 ? "⬇" : "⛰", P.map && P.map.getPitch()>5 ? "Vista de cima" : "Inclinar em 3D") : ""}
         ${isClear() ? "" : ib("satAnim", P.anim ? "■" : "▶", P.anim ? "Parar animação" : "Animar últimas 2 h")}
@@ -1844,11 +1873,11 @@ function panel(quick){
         ${grp("Imagem de satélite", `<div class="seg txt">${seg("data-p", Object.entries(PRODUCTS).map(([k,v])=>[k,v.nome]), P.prod)}</div>`, "lg-grow")}
       </div>
       <div class="lyr-row">
-        ${grp("Mapa base", [["sat","Satélite"],["map","Mapa"],["topo","Relevo"]].map(([k,n])=>`<button class="lb" data-base="${k}" aria-pressed="${P.base===k}" title="${n}" aria-label="${n}"><img src="${thumb(k)}" alt="" loading="lazy"><span>${n}</span></button>`).join(""))}
-        ${grp("Sobreposições", `${chip("satNames","Nomes e ruas",P.names)}${chip("satAlt","Altitude",P.alt)}${chip("satBld","Prédios 3D",P.bld)}${chip("satBr","Vias elevadas 3D",window.Bridges?.isOn())}
+        ${grp("Mapa base", BASES().map(([k,n])=>`<button class="lb" data-base="${k}" aria-pressed="${curBase()===k}" title="${n}" aria-label="${n}">${baseThumb(k)}<span>${n}</span></button>`).join(""))}
+        ${grp("Sobreposições", `${chip("satNames","Nomes e ruas",P.names)}${chip("satAlt","Altitude",P.alt)}${chip("satMt",`${window.Ico ? `<span class="ico-w ico-t">${window.Ico("finerelief", 18)}</span>` : ""}Relevo fino`,P.mt)}${chip("satBld","Prédios 3D",P.bld)}${chip("satBr","Vias elevadas 3D",window.Bridges?.isOn())}
           <button type="button" class="chip" id="nameT" title="Escolher quais nomes aparecem">🏷 Nomes: tipos…</button>${chip("satHgt","🏙 Altura das construções",P.hgt)}${chip("satPlaces","📍 Lugares",window.Places?.isOn())}<button type="button" class="chip" id="placesF" title="Escolher tipos de lugar">Tipos…</button>
           ${chip("ovRail","Transporte público",P.ovRail)}${chip("ovBike","Ciclovias",P.ovBike)}${chip("satTraffic","🚦 Trânsito ao vivo",window.Rotas?.isTraffic())}<button type="button" class="chip" id="satRoutes">🧭 Rotas</button>`, "lg-grow")}
-        ${grp("Ao vivo", `${chip("satAir","Aeronaves",P.air,` <em class="sp-n" id="airN">${P.air?P.planes.size:""}</em>`)}${chip("satRadar","Radar de chuva",P.showRadar)}${chip("satStar","Starlink",P.showStar)}${chip("satBg","Fundo do site",P.bg)}`)}
+        ${grp("Ao vivo", `${chip("satAir","Aeronaves",P.air,` <em class="sp-n" id="airN">${P.air?P.planes.size:""}</em>`)}${chip("satRadar","Radar de chuva",P.showRadar)}${chip("satFire","🔥 Queimadas",window.Fires?.isOn())}${chip("satStar","Starlink",P.showStar)}${chip("satBg","Fundo do site",P.bg)}`)}
       </div>
       ${P.air ? `<form class="fl-find" id="flFind"><input id="flQ" placeholder="Buscar voo em todo o mundo — ex.: GLO1670, TAM3302, AZU4558" autocomplete="off" aria-label="Buscar voo"><button class="mbtn">✈ Buscar</button><span id="flMsg"></span></form>` : ""}
       <div class="alt-leg" id="altLegend"${P.alt?"":" hidden"}><i></i><div><span>0</span><span>300</span><span>900</span><span>1.800</span><span>3.500 m</span></div></div>
@@ -1856,16 +1885,16 @@ function panel(quick){
     <div class="lyr-more"${P.more?"":" hidden"}>
       <p class="sp-tip">Arraste para mover, role ou pince para aproximar; botão direito arrasta para inclinar e girar. Funções do ponto (previsão, medir, endereço, Street View) ficam no ☰. Clique nos nomes para demarcar a região e nos aviões para ver o voo.</p>
       ${P.showStar ? `<div class="sp-star"><div class="sp-k"><b id="starT">${(P.count||0).toLocaleString("pt-BR")}</b><small>Starlink em órbita</small></div><div class="sp-k"><b id="starN">${ov.n}</b><small>acima de 25° sobre ${esc((C.S.loc||{}).name||"você")}</small></div></div><div id="starList" class="sp-list">${starList()}</div>` : ""}
-      <p class="sp-cred">Imagens NOAA GOES-19/18 e JMA Himawari-9 via NASA GIBS · mapa e relevo Esri · nomes OpenStreetMap/OpenFreeMap · transporte OpenRailwayMap · ciclovias CyclOSM · radar RainViewer · relevo 3D AWS Terrain Tiles · aeronaves adsb.lol (ODbL), adsbdb, trajetos OpenSky Network · órbitas CelesTrak · arranha-céus Wikidata (CC0) · globo MapLibre GL.</p>
+      <p class="sp-cred">Imagens NOAA GOES-19/18 e JMA Himawari-9 via NASA GIBS · mapa e relevo Esri · nomes OpenStreetMap/OpenFreeMap · transporte OpenRailwayMap · ciclovias CyclOSM · radar RainViewer · focos de calor NASA FIRMS (VIIRS 375 m) · relevo 3D AWS Terrain Tiles${P.mt ? " e Mapterhorn (Copernicus GLO-30 © DLR e.V. 2010–2014 e © Airbus Defence and Space GmbH 2014–2018, fornecido sob o COPERNICUS pela União Europeia e ESA; lidar nacionais)" : ""} · aeronaves adsb.lol (ODbL), adsbdb, trajetos OpenSky Network · órbitas CelesTrak · arranha-céus Wikidata (CC0) · globo MapLibre GL.</p>
     </div>`;
   stamp();
   $("satClose").onclick = ()=>{ if(mobile()) sheet(false); else location.hash = "#home"; };
   $("spMore").onclick = ()=>{ P.more = !P.more; el.querySelector(".lyr-more").hidden = !P.more; $("spMore").setAttribute("aria-expanded", P.more); };
   el.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>setProd(b.dataset.p));
   const ff = $("flFind"); if(ff) ff.onsubmit = async e=>{ e.preventDefault(); const m = $("flMsg"); m.textContent = "buscando…"; const ok = await findFlight($("flQ").value); m.textContent = ok ? "" : "voo não encontrado no ar agora"; };
-  el.querySelectorAll("[data-base]").forEach(b=>b.onclick=()=>setBase(b.dataset.base));
+  el.querySelectorAll("[data-base]").forEach(b=>b.onclick=()=>pickBase(b.dataset.base));
   el.querySelectorAll("[data-q]").forEach(b=>b.onclick=()=>{ const id = b.dataset.q;
-    ({satNames:()=>setNames(!P.names), satAlt:()=>setAlt(!P.alt), satBld:()=>setBld(!P.bld), br3d:()=>window.Bridges?.setOn(!window.Bridges.isOn()), ovRail:()=>setOv("ovRail",!P.ovRail), ovBike:()=>setOv("ovBike",!P.ovBike),
+    ({satNames:()=>setNames(!P.names), satAlt:()=>setAlt(!P.alt), satMt:()=>setMt(!P.mt), fire:()=>window.Fires?.setOn(!window.Fires.isOn()), satBld:()=>setBld(!P.bld), br3d:()=>window.Bridges?.setOn(!window.Bridges.isOn()), ovRail:()=>setOv("ovRail",!P.ovRail), ovBike:()=>setOv("ovBike",!P.ovBike),
       satAir:()=>setAir(!P.air), satRadar:()=>setRadar(!P.showRadar), satStar:()=>setStar(!P.showStar), places:()=>window.Places?.setOn(!window.Places.isOn()), names2:()=>nameTypes(), hgt:()=>setHgt(!P.hgt), apt:()=>window.Sim?.setOn(!window.Sim.isOn()), cams:()=>window.Cams?.setOn(!window.Cams.isOn()), volc:()=>window.Geo?.set("volc", !window.Geo.isOn("volc")), temp:()=>window.Geo?.set("temp", !window.Geo.isOn("temp")), traffic:()=>window.Rotas?.setTraffic(!window.Rotas.isTraffic()), routes:()=>window.Rotas?.isOpen() ? window.Rotas.close() : window.Rotas?.open(), drive:()=>window.Drive?.setOn(!window.Drive.isOn()), tour:()=>window.Drive?.tour(), met:()=>window.Meteo?.abrir()})[id](); panel(); });
   const _r = $("ovRail"); if(_r) $("ovRail").onclick = ()=>setOv("ovRail", !P.ovRail);
   if($("nameT")) $("nameT").onclick = nameTypes;
@@ -1900,9 +1929,11 @@ function panel(quick){
   $("satGlobe").onclick = globe;
   if($("satNames")) $("satNames").onclick = ()=>setNames(!P.names);
   if($("satAlt")) $("satAlt").onclick = ()=>setAlt(!P.alt);
+  if($("satMt")){ $("satMt").title = "Relevo 3D mais detalhado: Copernicus GLO-30 e lidar nacionais (Mapterhorn)"; $("satMt").onclick = ()=>setMt(!P.mt); }
   if($("satBld")) $("satBld").onclick = ()=>setBld(!P.bld);
   if($("satAir")) $("satAir").onclick = ()=>setAir(!P.air);
   if($("satRadar")) $("satRadar").onclick = ()=>setRadar(!P.showRadar);
+  if($("satFire")){ $("satFire").title = "Focos de calor das últimas 24 h (NASA FIRMS, VIIRS 375 m)"; $("satFire").onclick = ()=>{ window.Fires?.setOn(!window.Fires.isOn()); panel(); }; }
   if($("satStar")) $("satStar").onclick = ()=>setStar(!P.showStar);
   if($("satBg")) $("satBg").onclick = ()=>setBg(!P.bg);
 }
@@ -1938,5 +1969,5 @@ addEventListener("hashchange", route);
 if(document.readyState !== "loading") init(); else addEventListener("DOMContentLoaded", init);
 setTimeout(route, 0);
 
-window.Sat = {BLD_ALL, applyMode: () => applyMode(), setBase, base: () => P.base, thumb: k => thumb(k), nameTypes, panelRefresh: () => panel(), povStart, povStop, selectPlane, findFlight, setProj, planeCard, _planes: () => P.planes, setAir, isAir: () => P.air, setStar, setFrame, latest: () => P.times && Date.parse(P.times[2]), setNames, isNames: () => P.names, footer, map: () => P.map, resize: () => P.map?.resize(), elevAt, fmtAlt, setAlt, isAlt: () => P.alt, setBld, isBld: () => P.bld, measureStart, measureEnd, setProd, isClear, setLoc, overhead: () => P.overhead, count: () => P.count||0, time: () => P.time, enabled: () => P.showStar};
+window.Sat = {BLD_ALL, applyMode: () => applyMode(), setBase, base: () => P.base, thumb: k => thumb(k), nameTypes, panelRefresh: () => panel(), povStart, povStop, selectPlane, findFlight, setProj, planeCard, _planes: () => P.planes, setAir, isAir: () => P.air, setStar, setFrame, latest: () => P.times && Date.parse(P.times[2]), setNames, isNames: () => P.names, footer, map: () => P.map, resize: () => P.map?.resize(), elevAt, fmtAlt, setAlt, isAlt: () => P.alt, setMt, isMt: () => P.mt, setBld, isBld: () => P.bld, measureStart, measureEnd, setProd, isClear, setLoc, overhead: () => P.overhead, count: () => P.count||0, time: () => P.time, enabled: () => P.showStar};
 })();
